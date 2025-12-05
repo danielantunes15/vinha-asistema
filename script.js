@@ -4,7 +4,8 @@
 const usinaLocation = [-17.6435490000631, -40.18241647057885]; 
 const map = L.map('map', { 
     zoomControl: false, // Vamos usar controles personalizados se precisar
-    attributionControl: false 
+    attributionControl: false,
+    doubleClickZoom: false // CORREÇÃO: Impede zoom no duplo clique para permitir finalizar linhas
 }).setView(usinaLocation, 16);
 
 // Camada de Satélite Google
