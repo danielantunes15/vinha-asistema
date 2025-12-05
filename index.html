@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestão de Irrigação - Usina</title>
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <div id="map"></div>
+
+    <div class="control-panel">
+        <h2><i class="fa-solid fa-satellite-dish"></i> Painel da Usina</h2>
+        
+        <div class="tools">
+            <button id="btn-main" onclick="handleMainButton()">
+                <i class="fa-solid fa-plus"></i> Nova Linha
+            </button>
+            
+            <button id="btn-burst" class="danger-outline-btn" onclick="setMode('burst')">
+                <i class="fa-solid fa-triangle-exclamation"></i> Reportar Vazamento
+            </button>
+
+            <button id="btn-simulate" class="action-btn" onclick="toggleSimulation()">
+                <i class="fa-solid fa-play"></i> Simular Fluxo
+            </button>
+            
+            <button id="btn-clear" class="danger-btn" onclick="clearAllData()">
+                <i class="fa-solid fa-trash"></i> Resetar Sistema
+            </button>
+        </div>
+
+        <div id="status-msg">Pronto para iniciar</div>
+        
+        <hr style="border-color: rgba(255,255,255,0.1); margin: 15px 0;">
+        
+        <h3>Linhas Cadastradas</h3>
+        <div id="saved-list" class="saved-items-container">
+            <p style="text-align:center; color:#666; font-size: 0.8rem;">Carregando...</p>
+        </div>
+    </div>
+
+    <div id="modal-form" class="modal-overlay" style="display: none;">
+        <div class="modal-content">
+            <h3><i class="fa-solid fa-pen-to-square"></i> Dados da Linha</h3>
+            <div class="form-group">
+                <label>Nome da Linha / Setor:</label>
+                <input type="text" id="input-name" placeholder="Ex: Adutora Setor Norte" autocomplete="off">
+            </div>
+            <div class="form-group">
+                <label>Tipo de Fluido:</label>
+                <select id="input-type">
+                    <option value="vinhaça">Vinhaça (Pura)</option>
+                    <option value="agua">Água Residual</option>
+                </select>
+            </div>
+            <div class="modal-actions">
+                <button class="danger-btn" onclick="cancelAction()">Cancelar</button>
+                <button class="action-btn" onclick="saveNewData()">Salvar</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>

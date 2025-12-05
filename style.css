@@ -1,0 +1,119 @@
+/* =========================================
+   RESET E ESTRUTURA
+   ========================================= */
+body, html { margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, sans-serif; height: 100%; width: 100%; overflow: hidden; background-color: #0f172a; }
+#map { height: 100vh; width: 100%; z-index: 1; background: #000; }
+
+/* =========================================
+   PAINEL DE CONTROLE
+   ========================================= */
+.control-panel {
+    position: absolute; top: 20px; left: 20px; width: 320px;
+    background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(5px);
+    padding: 20px; border-radius: 12px;
+    box-shadow: 0 4px 25px rgba(0, 0, 0, 0.6);
+    color: white; z-index: 1000;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    max-height: 90vh; overflow-y: auto;
+}
+.control-panel h2 { margin: 0 0 20px 0; font-size: 1.2rem; color: #38bdf8; display: flex; align-items: center; gap: 10px; font-weight: 700; }
+.control-panel h3 { font-size: 0.95rem; color: #94a3b8; margin: 15px 0 10px 0; text-transform: uppercase; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 5px; }
+#status-msg { margin-top: 15px; padding: 10px; background: rgba(255, 255, 255, 0.05); border-radius: 6px; text-align: center; font-size: 0.85rem; color: #cbd5e1; border: 1px dashed rgba(255,255,255,0.2); }
+
+/* =========================================
+   BOTÕES
+   ========================================= */
+.tools { display: flex; flex-direction: column; gap: 10px; }
+button { padding: 12px; border: none; border-radius: 8px; cursor: pointer; background-color: #334155; color: white; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 10px; transition: all 0.2s ease; }
+button:hover { background-color: #475569; transform: translateY(-1px); }
+button.active { background-color: #eab308; color: #fff; }
+
+/* Botão Específico de Vazamento */
+.danger-outline-btn { border: 1px solid #ef4444; color: #ef4444; background: transparent; }
+.danger-outline-btn:hover { background: #ef4444; color: white; }
+button.burst-mode { background-color: #ef4444; color: white; animation: pulseBtn 1.5s infinite; }
+
+@keyframes pulseBtn { 0% { opacity: 1; } 50% { opacity: 0.8; } 100% { opacity: 1; } }
+
+.btn-save-edit { background-color: #f59e0b !important; }
+.action-btn { background: linear-gradient(135deg, #16a34a, #15803d); }
+.danger-btn { background-color: #dc2626; }
+
+/* =========================================
+   LISTA LATERAL
+   ========================================= */
+.saved-items-container { margin-top: 10px; }
+.saved-item { background: rgba(30, 41, 59, 0.6); padding: 12px; margin-bottom: 8px; border-radius: 8px; border-left: 4px solid #38bdf8; display: flex; justify-content: space-between; align-items: center; }
+.saved-item.has-burst { border-left-color: #ef4444; background: rgba(239, 68, 68, 0.1); }
+.saved-item:hover { background: rgba(30, 41, 59, 1); }
+.item-info { cursor: pointer; flex-grow: 1; }
+.item-actions { display: flex; gap: 5px; }
+.btn-icon { background: transparent; padding: 6px; width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; border: none; color: white; }
+.btn-edit { color: #facc15; } .btn-edit:hover { background: rgba(250, 204, 21, 0.1); }
+.btn-del { color: #ef4444; } .btn-del:hover { background: rgba(239, 68, 68, 0.1); }
+.btn-repair { color: #22c55e; } .btn-repair:hover { background: rgba(34, 197, 94, 0.1); }
+
+/* =========================================
+   MODAL
+   ========================================= */
+.modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.7); z-index: 2000; display: flex; justify-content: center; align-items: center; }
+.modal-content { background: #1e293b; padding: 30px; border-radius: 16px; width: 90%; max-width: 350px; color: white; border: 1px solid #475569; }
+.form-group { margin-bottom: 20px; }
+.form-group label { display: block; margin-bottom: 8px; color: #94a3b8; }
+.form-group input, .form-group select { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #475569; background: #0f172a; color: white; box-sizing: border-box; }
+.modal-actions { display: flex; gap: 15px; margin-top: 25px; } .modal-actions button { flex: 1; }
+
+/* =========================================
+   MARCADORES E ANIMAÇÕES (CSS AVANÇADO)
+   ========================================= */
+
+/* 1. Animação do Fluxo (Pontilhado correndo) */
+@keyframes flowAnimation { from { stroke-dashoffset: 20; } to { stroke-dashoffset: 0; } }
+.vinasse-flow { stroke-dasharray: 10, 10; animation: flowAnimation 0.8s linear infinite; }
+
+/* 2. Marcador de Edição (Bolinha branca) */
+.edit-marker { background-color: #fff; border: 2px solid #ea580c; border-radius: 50%; cursor: grab; }
+
+/* 3. ÍCONE DE VAZAMENTO ANIMADO (O QUE VOCÊ PEDIU) */
+.leak-alert-wrapper {
+    display: flex; justify-content: center; align-items: center;
+    width: 40px; height: 40px;
+}
+
+.leak-alert-icon {
+    width: 30px; height: 30px;
+    background-color: #ef4444; /* Vermelho */
+    border-radius: 50%;
+    color: white;
+    display: flex; justify-content: center; align-items: center;
+    font-size: 14px;
+    z-index: 2;
+    position: relative;
+    box-shadow: 0 0 10px rgba(0,0,0,0.5);
+}
+
+/* Efeito de onda de choque (Ripple) */
+.leak-alert-icon::after {
+    content: '';
+    position: absolute;
+    width: 100%; height: 100%;
+    border-radius: 50%;
+    background-color: rgba(239, 68, 68, 0.6);
+    z-index: -1;
+    animation: ripple 1.5s infinite ease-out;
+}
+
+.leak-alert-icon::before {
+    content: '';
+    position: absolute;
+    width: 100%; height: 100%;
+    border-radius: 50%;
+    background-color: rgba(239, 68, 68, 0.4);
+    z-index: -1;
+    animation: ripple 1.5s infinite ease-out 0.4s; /* Atraso para segunda onda */
+}
+
+@keyframes ripple {
+    0% { transform: scale(1); opacity: 0.8; }
+    100% { transform: scale(3); opacity: 0; }
+}
