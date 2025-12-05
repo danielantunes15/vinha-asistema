@@ -1,119 +1,164 @@
 /* =========================================
-   RESET E ESTRUTURA
+   RESET E ESTRUTURA GERAL
    ========================================= */
-body, html { margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, sans-serif; height: 100%; width: 100%; overflow: hidden; background-color: #0f172a; }
-#map { height: 100vh; width: 100%; z-index: 1; background: #000; }
+body, html { margin: 0; padding: 0; font-family: 'Inter', sans-serif; height: 100%; width: 100%; overflow: hidden; background-color: #0f172a; }
+#map { height: 100vh; width: 100%; z-index: 0; background: #000; }
 
 /* =========================================
-   PAINEL DE CONTROLE
+   DASHBOARD LATERAL (VIDRO / GLASSMORPHISM)
    ========================================= */
-.control-panel {
-    position: absolute; top: 20px; left: 20px; width: 320px;
-    background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(5px);
-    padding: 20px; border-radius: 12px;
-    box-shadow: 0 4px 25px rgba(0, 0, 0, 0.6);
-    color: white; z-index: 1000;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    max-height: 90vh; overflow-y: auto;
+.dashboard-container {
+    position: absolute; top: 0; left: 0; bottom: 0; width: 380px;
+    background: rgba(15, 23, 42, 0.90); /* Fundo escuro translúcido */
+    backdrop-filter: blur(15px); /* Desfoque de fundo */
+    border-right: 1px solid rgba(255,255,255,0.1);
+    z-index: 1000;
+    display: flex; flex-direction: column;
+    box-shadow: 10px 0 30px rgba(0,0,0,0.5);
+    color: #e2e8f0;
+    transition: transform 0.3s ease;
 }
-.control-panel h2 { margin: 0 0 20px 0; font-size: 1.2rem; color: #38bdf8; display: flex; align-items: center; gap: 10px; font-weight: 700; }
-.control-panel h3 { font-size: 0.95rem; color: #94a3b8; margin: 15px 0 10px 0; text-transform: uppercase; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 5px; }
-#status-msg { margin-top: 15px; padding: 10px; background: rgba(255, 255, 255, 0.05); border-radius: 6px; text-align: center; font-size: 0.85rem; color: #cbd5e1; border: 1px dashed rgba(255,255,255,0.2); }
+
+/* Header do Dashboard */
+.dash-header { padding: 25px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.05); }
+.logo-area { display: flex; gap: 12px; align-items: center; color: #38bdf8; }
+.logo-area h1 { font-size: 1.1rem; margin: 0; font-weight: 800; letter-spacing: -0.5px; color: #fff; }
+.logo-area small { font-size: 0.7rem; color: #94a3b8; font-weight: 400; display: block; }
+
+/* Badges de Status */
+.badge { padding: 4px 10px; border-radius: 20px; font-size: 0.65rem; font-weight: bold; letter-spacing: 0.5px; text-transform: uppercase; }
+.badge-offline { background: #334155; color: #94a3b8; border: 1px solid #475569; }
+.badge-online { background: rgba(34, 197, 94, 0.15); color: #4ade80; border: 1px solid #22c55e; box-shadow: 0 0 10px rgba(34, 197, 94, 0.2); }
 
 /* =========================================
-   BOTÕES
+   CONTROLE MESTRE (BOTÃO GRANDE)
    ========================================= */
-.tools { display: flex; flex-direction: column; gap: 10px; }
-button { padding: 12px; border: none; border-radius: 8px; cursor: pointer; background-color: #334155; color: white; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 10px; transition: all 0.2s ease; }
-button:hover { background-color: #475569; transform: translateY(-1px); }
-button.active { background-color: #eab308; color: #fff; }
+.master-control { padding: 20px; }
+#btn-master-start {
+    width: 100%; padding: 16px; border: none; border-radius: 12px;
+    background: linear-gradient(145deg, #1e293b, #0f172a);
+    border: 1px solid #334155; color: #fff; cursor: pointer;
+    display: flex; align-items: center; gap: 15px;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative; overflow: hidden;
+}
+#btn-master-start:hover { border-color: #38bdf8; box-shadow: 0 4px 15px rgba(56, 189, 248, 0.15); transform: translateY(-1px); }
+#btn-master-start.active { background: linear-gradient(135deg, #15803d, #16a34a); border-color: #22c55e; box-shadow: 0 0 25px rgba(34, 197, 94, 0.3); }
 
-/* Botão Específico de Vazamento */
-.danger-outline-btn { border: 1px solid #ef4444; color: #ef4444; background: transparent; }
-.danger-outline-btn:hover { background: #ef4444; color: white; }
-button.burst-mode { background-color: #ef4444; color: white; animation: pulseBtn 1.5s infinite; }
+.power-icon { font-size: 1.6rem; color: #64748b; transition: color 0.3s; }
+#btn-master-start.active .power-icon { color: #fff; animation: pulseGlow 2s infinite; }
+.btn-text { text-align: left; display: flex; flex-direction: column; }
+.btn-text span { font-weight: 700; font-size: 0.9rem; letter-spacing: 0.5px; }
+.btn-text small { font-size: 0.7rem; color: #94a3b8; }
+#btn-master-start.active .btn-text small { color: #dcfce7; }
 
-@keyframes pulseBtn { 0% { opacity: 1; } 50% { opacity: 0.8; } 100% { opacity: 1; } }
-
-.btn-save-edit { background-color: #f59e0b !important; }
-.action-btn { background: linear-gradient(135deg, #16a34a, #15803d); }
-.danger-btn { background-color: #dc2626; }
+@keyframes pulseGlow { 0% { opacity: 1; } 50% { opacity: 0.7; } 100% { opacity: 1; } }
 
 /* =========================================
-   LISTA LATERAL
+   CARDS E ESTATÍSTICAS
    ========================================= */
-.saved-items-container { margin-top: 10px; }
-.saved-item { background: rgba(30, 41, 59, 0.6); padding: 12px; margin-bottom: 8px; border-radius: 8px; border-left: 4px solid #38bdf8; display: flex; justify-content: space-between; align-items: center; }
-.saved-item.has-burst { border-left-color: #ef4444; background: rgba(239, 68, 68, 0.1); }
-.saved-item:hover { background: rgba(30, 41, 59, 1); }
-.item-info { cursor: pointer; flex-grow: 1; }
-.item-actions { display: flex; gap: 5px; }
-.btn-icon { background: transparent; padding: 6px; width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; border: none; color: white; }
-.btn-edit { color: #facc15; } .btn-edit:hover { background: rgba(250, 204, 21, 0.1); }
-.btn-del { color: #ef4444; } .btn-del:hover { background: rgba(239, 68, 68, 0.1); }
-.btn-repair { color: #22c55e; } .btn-repair:hover { background: rgba(34, 197, 94, 0.1); }
+.stats-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; padding: 0 20px; }
+.stat-card { background: rgba(255,255,255,0.03); padding: 12px; border-radius: 8px; text-align: center; border: 1px solid rgba(255,255,255,0.05); }
+.stat-title { font-size: 0.65rem; color: #94a3b8; display: block; margin-bottom: 5px; text-transform: uppercase; font-weight: 600; }
+.stat-value { font-size: 1.1rem; font-weight: 700; color: #f1f5f9; display: block; }
+.stat-value small { font-size: 0.7rem; font-weight: 400; color: #64748b; }
+.alert-card .stat-value { color: #ef4444; }
+
+.divider { border: 0; height: 1px; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent); margin: 20px 0; }
+
+/* =========================================
+   LISTA DE MONITORAMENTO
+   ========================================= */
+.lines-monitor { flex-grow: 1; padding: 0 20px; display: flex; flex-direction: column; overflow: hidden; }
+.section-title { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+.section-title h3 { font-size: 0.85rem; color: #cbd5e1; margin: 0; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; }
+
+.btn-mini { background: #3b82f6; border: none; color: white; padding: 5px 12px; border-radius: 6px; font-size: 0.75rem; cursor: pointer; font-weight: 600; transition: background 0.2s; display: flex; align-items: center; gap: 5px; }
+.btn-mini:hover { background: #2563eb; }
+
+.scrollable-list { overflow-y: auto; flex-grow: 1; padding-right: 5px; padding-bottom: 10px; }
+.scrollable-list::-webkit-scrollbar { width: 4px; }
+.scrollable-list::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+.empty-msg { text-align: center; color: #475569; font-size: 0.9rem; margin-top: 30px; }
+
+/* Card de Linha Individual */
+.line-card { background: rgba(30, 41, 59, 0.4); border-radius: 8px; padding: 15px; margin-bottom: 12px; border-left: 3px solid #64748b; transition: all 0.2s; position: relative; border: 1px solid rgba(255,255,255,0.02); }
+.line-card:hover { background: rgba(30, 41, 59, 0.8); transform: translateX(2px); border-color: rgba(255,255,255,0.1); }
+.line-card.vinhaça { border-left-color: #d946ef; }
+.line-card.agua { border-left-color: #3b82f6; }
+.line-card.leak { border-left-color: #ef4444; background: rgba(220, 38, 38, 0.15); border-right: 1px solid #ef4444; }
+
+.card-top { display: flex; justify-content: space-between; margin-bottom: 10px; align-items: center; }
+.line-name { font-weight: 600; font-size: 0.9rem; color: #e2e8f0; }
+.line-meta { font-size: 0.75rem; color: #94a3b8; display: block; margin-top: 2px; }
+.line-status { font-size: 0.65rem; padding: 2px 6px; border-radius: 4px; background: rgba(255,255,255,0.05); color: #94a3b8; }
+.line-card.leak .line-status { background: #ef4444; color: white; font-weight: bold; animation: pulseBtn 1s infinite; }
+
+/* Barra de Pressão (Manômetro Digital) */
+.pressure-wrapper { margin-top: 8px; }
+.pressure-info { display: flex; justify-content: space-between; font-size: 0.75rem; color: #94a3b8; margin-bottom: 5px; }
+.pressure-bar-bg { height: 8px; background: #0f172a; border-radius: 4px; overflow: hidden; position: relative; box-shadow: inset 0 1px 3px rgba(0,0,0,0.5); }
+.pressure-fill { height: 100%; width: 0%; background: linear-gradient(90deg, #3b82f6, #22c55e); transition: width 1.5s cubic-bezier(0.4, 0, 0.2, 1), background 0.3s; border-radius: 4px; }
+.line-card.leak .pressure-fill { background: #ef4444; width: 15% !important; box-shadow: 0 0 10px #ef4444; }
+
+/* Botões de Ação do Card */
+.card-actions { text-align: right; margin-top: 10px; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 8px; display: flex; justify-content: flex-end; gap: 8px; }
+.btn-card { padding: 4px 10px; border-radius: 4px; font-size: 0.7rem; cursor: pointer; border: none; color: white; }
+.btn-repair { background: #22c55e; }
+.btn-repair:hover { background: #16a34a; }
+.btn-del { background: transparent; color: #64748b; border: 1px solid #334155; }
+.btn-del:hover { border-color: #ef4444; color: #ef4444; }
+
+/* =========================================
+   BARRA DE FERRAMENTAS INFERIOR
+   ========================================= */
+.tools-bar { padding: 15px 20px; display: flex; gap: 10px; border-top: 1px solid rgba(255,255,255,0.05); background: rgba(15, 23, 42, 0.5); }
+.tool-btn { flex: 1; padding: 12px; border: none; border-radius: 8px; cursor: pointer; color: white; font-size: 0.8rem; transition: 0.2s; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 8px; }
+.tool-btn.danger { background: rgba(239, 68, 68, 0.1); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3); }
+.tool-btn.danger:hover, .tool-btn.danger.active { background: #ef4444; color: white; }
+.tool-btn.warning { background: rgba(245, 158, 11, 0.1); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.3); }
+.tool-btn.warning:hover { background: #f59e0b; color: white; }
+
+/* Animação do botão de vazamento quando ativo */
+.tool-btn.danger.burst-mode { animation: pulseBtn 1s infinite; background: #ef4444; color: white; }
 
 /* =========================================
    MODAL
    ========================================= */
-.modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.7); z-index: 2000; display: flex; justify-content: center; align-items: center; }
-.modal-content { background: #1e293b; padding: 30px; border-radius: 16px; width: 90%; max-width: 350px; color: white; border: 1px solid #475569; }
-.form-group { margin-bottom: 20px; }
-.form-group label { display: block; margin-bottom: 8px; color: #94a3b8; }
-.form-group input, .form-group select { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #475569; background: #0f172a; color: white; box-sizing: border-box; }
-.modal-actions { display: flex; gap: 15px; margin-top: 25px; } .modal-actions button { flex: 1; }
+.modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.8); z-index: 2000; display: flex; justify-content: center; align-items: center; backdrop-filter: blur(5px); }
+.modal-content { background: #1e293b; padding: 30px; border-radius: 16px; width: 320px; border: 1px solid #334155; color: white; box-shadow: 0 20px 50px rgba(0,0,0,0.5); }
+.modal-content h3 { margin-top: 0; color: #38bdf8; display: flex; align-items: center; gap: 10px; }
+.form-group { margin-bottom: 15px; }
+.form-group label { display: block; margin-bottom: 6px; color: #94a3b8; font-size: 0.85rem; }
+.form-group input, .form-group select { width: 100%; padding: 12px; background: #0f172a; border: 1px solid #334155; color: white; border-radius: 8px; box-sizing: border-box; font-size: 0.9rem; }
+.form-group input:focus, .form-group select:focus { outline: none; border-color: #38bdf8; }
+.modal-actions { display: flex; gap: 10px; margin-top: 25px; }
+.action-btn { background: #22c55e; color: white; border: none; padding: 12px; border-radius: 8px; flex: 1; cursor: pointer; font-weight: 600; }
+.action-btn:hover { background: #16a34a; }
+.danger-btn { background: #ef4444; color: white; border: none; padding: 12px; border-radius: 8px; flex: 1; cursor: pointer; font-weight: 600; }
+.danger-btn:hover { background: #dc2626; }
 
 /* =========================================
-   MARCADORES E ANIMAÇÕES (CSS AVANÇADO)
+   MAPA E MARCADORES (ANIMAÇÕES)
    ========================================= */
-
-/* 1. Animação do Fluxo (Pontilhado correndo) */
+/* Fluxo na tubulação */
 @keyframes flowAnimation { from { stroke-dashoffset: 20; } to { stroke-dashoffset: 0; } }
-.vinasse-flow { stroke-dasharray: 10, 10; animation: flowAnimation 0.8s linear infinite; }
+.vinasse-flow { stroke-dasharray: 10, 10; animation: flowAnimation 0.5s linear infinite; }
 
-/* 2. Marcador de Edição (Bolinha branca) */
-.edit-marker { background-color: #fff; border: 2px solid #ea580c; border-radius: 50%; cursor: grab; }
+/* Marcadores de Edição */
+.edit-marker { background-color: #fff; border: 2px solid #ea580c; border-radius: 50%; cursor: grab; transition: transform 0.1s; }
+.edit-marker:hover { transform: scale(1.2); }
 
-/* 3. ÍCONE DE VAZAMENTO ANIMADO (O QUE VOCÊ PEDIU) */
-.leak-alert-wrapper {
-    display: flex; justify-content: center; align-items: center;
-    width: 40px; height: 40px;
-}
+/* ÍCONE DE VAZAMENTO (RIPPLE EFFECT) */
+.leak-alert-wrapper { display: flex; justify-content: center; align-items: center; width: 40px; height: 40px; }
+.leak-alert-icon { width: 30px; height: 30px; background-color: #ef4444; border-radius: 50%; color: white; display: flex; justify-content: center; align-items: center; font-size: 14px; z-index: 2; position: relative; box-shadow: 0 0 15px rgba(239, 68, 68, 0.8); }
 
-.leak-alert-icon {
-    width: 30px; height: 30px;
-    background-color: #ef4444; /* Vermelho */
-    border-radius: 50%;
-    color: white;
-    display: flex; justify-content: center; align-items: center;
-    font-size: 14px;
-    z-index: 2;
-    position: relative;
-    box-shadow: 0 0 10px rgba(0,0,0,0.5);
-}
+.leak-alert-icon::after { content: ''; position: absolute; width: 100%; height: 100%; border-radius: 50%; background-color: rgba(239, 68, 68, 0.6); z-index: -1; animation: ripple 1.5s infinite ease-out; }
+.leak-alert-icon::before { content: ''; position: absolute; width: 100%; height: 100%; border-radius: 50%; background-color: rgba(239, 68, 68, 0.4); z-index: -1; animation: ripple 1.5s infinite ease-out 0.4s; }
 
-/* Efeito de onda de choque (Ripple) */
-.leak-alert-icon::after {
-    content: '';
-    position: absolute;
-    width: 100%; height: 100%;
-    border-radius: 50%;
-    background-color: rgba(239, 68, 68, 0.6);
-    z-index: -1;
-    animation: ripple 1.5s infinite ease-out;
-}
+@keyframes ripple { 0% { transform: scale(1); opacity: 0.8; } 100% { transform: scale(3.5); opacity: 0; } }
+@keyframes pulseBtn { 0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; } }
 
-.leak-alert-icon::before {
-    content: '';
-    position: absolute;
-    width: 100%; height: 100%;
-    border-radius: 50%;
-    background-color: rgba(239, 68, 68, 0.4);
-    z-index: -1;
-    animation: ripple 1.5s infinite ease-out 0.4s; /* Atraso para segunda onda */
-}
-
-@keyframes ripple {
-    0% { transform: scale(1); opacity: 0.8; }
-    100% { transform: scale(3); opacity: 0; }
-}
+/* Toast Notification */
+.toast { position: fixed; bottom: 20px; right: 20px; background: #334155; color: white; padding: 12px 24px; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); z-index: 3000; transition: opacity 0.3s; opacity: 1; font-size: 0.9rem; border-left: 4px solid #38bdf8; }
+.toast.hidden { opacity: 0; pointer-events: none; }

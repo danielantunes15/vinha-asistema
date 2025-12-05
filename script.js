@@ -1,79 +1,202 @@
 // ==========================================
-// 1. CONFIGURAÇÃO INICIAL
+// 1. CONFIGURAÇÃO INICIAL E VARIÁVEIS
 // ==========================================
 const usinaLocation = [-17.6435490000631, -40.18241647057885]; 
-const map = L.map('map', { doubleClickZoom: false }).setView(usinaLocation, 16);
+const map = L.map('map', { 
+    zoomControl: false, // Vamos usar controles personalizados se precisar
+    attributionControl: false 
+}).setView(usinaLocation, 16);
 
+// Camada de Satélite Google
 L.tileLayer('http://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}',{
-    maxZoom: 20, subdomains:['mt0','mt1','mt2','mt3']
+    maxZoom: 21, 
+    subdomains:['mt0','mt1','mt2','mt3']
 }).addTo(map);
 
-// Variáveis Globais
-let appState = 'IDLE'; 
+// Variáveis de Estado
+let appState = 'IDLE'; // Estados: IDLE, CREATING, BURSTING
+let systemActive = false; // Estado do botão Master (ON/OFF)
+let dbLines = []; 
+
+// Variáveis de Edição/Criação
 let activeLinePoints = []; 
 let activePolyline = null; 
 let editMarkers = []; 
-let editingId = null; 
-let dbLines = []; 
-let isSimulating = false;
 
+// Inicialização
 loadFromStorage();
+showToast("Sistema carregado. Pronto para operação.");
 
 // ==========================================
-// 2. MODOS DE OPERAÇÃO
+// 2. LÓGICA DO PAINEL DE CONTROLE (NOVO)
+// ==========================================
+
+// Alternar o botão Master (Ligar/Desligar Usina)
+function toggleSystemPower() {
+    systemActive = !systemActive;
+    const btn = document.getElementById('btn-master-start');
+    const badge = document.getElementById('sys-status-badge');
+    const label = document.getElementById('btn-master-label');
+    
+    if (systemActive) {
+        // LIGAR
+        btn.classList.add('active');
+        label.innerText = "PARAR PRESSURIZAÇÃO";
+        badge.innerText = "ONLINE - BOMBAS ATIVAS";
+        badge.className = "badge badge-online";
+        showToast("Iniciando bombas... Pressurizando rede.");
+        
+        // Ativar visualização de fluxo no mapa
+        dbLines.forEach(line => {
+            if(!line.burst) animateLineFlow(line, true);
+        });
+    } else {
+        // DESLIGAR
+        btn.classList.remove('active');
+        label.innerText = "INICIAR PRESSURIZAÇÃO";
+        badge.innerText = "OFFLINE";
+        badge.className = "badge badge-offline";
+        showToast("Desligando sistema. Fluxo interrompido.");
+        
+        // Parar visualização
+        dbLines.forEach(line => animateLineFlow(line, false));
+    }
+    
+    // Atualiza todos os manômetros e cards
+    updateDashboard();
+}
+
+// Atualiza o Dashboard Lateral (HTML dos Cards)
+function updateDashboard() {
+    const list = document.getElementById('lines-dashboard-list');
+    list.innerHTML = '';
+    
+    let totalLines = dbLines.length;
+    let totalLeaks = 0;
+    let totalPressureSum = 0;
+    let activeCount = 0;
+    
+    if(totalLines === 0) {
+        list.innerHTML = '<p class="empty-msg">Nenhuma linha cadastrada.<br>Clique em "Nova Linha" para começar.</p>';
+        updateStats(0, 0, 0);
+        return;
+    }
+
+    dbLines.forEach(line => {
+        const hasBurst = line.burst && line.burst.active;
+        if(hasBurst) totalLeaks++;
+        
+        // Simulação de Pressão
+        let displayPressure = 0;
+        let pressureWidth = 0;
+        
+        if (systemActive) {
+            // Se tiver vazamento, pressão cai drasticamente para 1.2
+            // Se normal, sobe até a pressão nominal configurada
+            displayPressure = hasBurst ? 1.2 : (line.nominalPressure || 4.0);
+            
+            if(!hasBurst) {
+                totalPressureSum += displayPressure;
+                activeCount++;
+            }
+            
+            // Calcula % da barra (Baseado em máx 10kgf para visualização)
+            pressureWidth = (displayPressure / 10) * 100; 
+            if(pressureWidth > 100) pressureWidth = 100;
+        }
+
+        const distanceKm = calculateTotalDistance(line.points);
+
+        const el = document.createElement('div');
+        el.className = `line-card ${line.type} ${hasBurst ? 'leak' : ''}`;
+        el.onclick = (e) => {
+            // Se clicar no card, foca no mapa, a menos que clique num botão
+            if(e.target.tagName !== 'BUTTON' && e.target.tagName !== 'I') zoomToLine(line.id);
+        };
+        
+        el.innerHTML = `
+            <div class="card-top">
+                <div>
+                    <span class="line-name">${line.name}</span>
+                    <span class="line-meta">${distanceKm} • ${line.type.toUpperCase()}</span>
+                </div>
+                <span class="line-status">
+                    ${hasBurst ? 'CRÍTICO' : (systemActive ? 'ATIVO' : 'STANDBY')}
+                </span>
+            </div>
+            
+            <div class="pressure-wrapper">
+                <div class="pressure-info">
+                    <span>Pressão Monitorada</span>
+                    <span><strong>${displayPressure.toFixed(1)}</strong> kgf/cm²</span>
+                </div>
+                <div class="pressure-bar-bg">
+                    <div class="pressure-fill" style="width: ${pressureWidth}%"></div>
+                </div>
+            </div>
+
+            <div class="card-actions">
+                 ${hasBurst ? 
+                  `<button class="btn-card btn-repair" onclick="repairLine(${line.id}, event)"><i class="fa-solid fa-wrench"></i> Reparar</button>` : 
+                  `<button class="btn-card btn-del" onclick="deleteLine(${line.id}, event)"><i class="fa-solid fa-trash"></i></button>`
+                }
+            </div>
+        `;
+        list.appendChild(el);
+    });
+
+    // Média de pressão apenas das linhas ativas e sem vazamento
+    const avgP = activeCount > 0 ? (totalPressureSum / activeCount).toFixed(1) : "0.0";
+    updateStats(totalLines, totalLeaks, avgP);
+}
+
+function updateStats(lines, leaks, pressure) {
+    document.getElementById('count-lines').innerText = lines;
+    document.getElementById('count-leaks').innerText = leaks;
+    document.getElementById('avg-pressure').innerHTML = `${pressure} <small>kgf</small>`;
+}
+
+// Calcula Distância em KM
+function calculateTotalDistance(points) {
+    let totalDistance = 0;
+    for (let i = 0; i < points.length - 1; i++) {
+        totalDistance += map.distance(points[i], points[i+1]);
+    }
+    const km = totalDistance / 1000;
+    if(km < 1) return Math.round(totalDistance) + ' m';
+    return km.toFixed(2) + ' km';
+}
+
+// ==========================================
+// 3. MODOS DE INTERAÇÃO (Criar, Vazamento)
 // ==========================================
 
 function setMode(mode) {
-    if (appState === 'CREATING' || appState === 'EDITING') cancelAction();
-    
-    // Reseta botões
-    document.querySelectorAll('button').forEach(b => {
-        b.classList.remove('active', 'burst-mode', 'btn-save-edit');
-        if(!b.classList.contains('action-btn') && !b.classList.contains('danger-btn')) {
-            b.style.backgroundColor = '';
-        }
-    });
-
-    const btnMain = document.getElementById('btn-main');
-    const btnBurst = document.getElementById('btn-burst');
+    // Limpa estados anteriores
+    if (appState === 'CREATING') cancelAction();
+    document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active', 'burst-mode'));
 
     if (mode === 'burst') {
         appState = 'BURSTING';
-        btnBurst.classList.add('burst-mode');
-        updateStatus('⚠️ MODO VAZAMENTO: Clique exatamente no local da quebra da tubulação.');
+        document.querySelector('.tool-btn.danger').classList.add('active', 'burst-mode');
+        showToast("⚠️ MODO ALERTA: Clique na tubulação onde há vazamento.");
         map.getContainer().style.cursor = 'crosshair';
     } 
     else if (mode === 'create') {
-        startCreation();
+        appState = 'CREATING';
+        activeLinePoints = [];
+        activePolyline = null;
+        showToast("MODO DESENHO: Clique no mapa para traçar a rota.");
+        map.getContainer().style.cursor = 'crosshair';
     }
     else {
         appState = 'IDLE';
-        btnMain.innerHTML = '<i class="fa-solid fa-plus"></i> Nova Linha';
-        updateStatus('Painel de Controle');
         map.getContainer().style.cursor = '';
     }
 }
 
-function handleMainButton() {
-    if (appState === 'IDLE') setMode('create');
-    else if (appState === 'CREATING') {
-        if (activeLinePoints.length > 1) openModal();
-        else cancelAction();
-    } else if (appState === 'EDITING') {
-        saveEditedLine();
-    }
-}
-
-function startCreation() {
-    appState = 'CREATING';
-    activeLinePoints = [];
-    activePolyline = null;
-    updateUI('Clique no mapa para desenhar. Clique no botão "Concluir" para salvar.', 'finish');
-    map.getContainer().style.cursor = 'crosshair';
-}
-
 // ==========================================
-// 3. EVENTOS DO MAPA
+// 4. EVENTOS DO MAPA
 // ==========================================
 
 map.on('click', (e) => {
@@ -81,31 +204,41 @@ map.on('click', (e) => {
         activeLinePoints.push(e.latlng);
         drawActivePolyline();
     } 
-    else if (appState === 'EDITING') {
-        activeLinePoints.push(e.latlng);
-        drawActivePolyline();
-        renderEditMarkers();
-    }
     else if (appState === 'BURSTING') {
         handleBurstClick(e.latlng);
     }
 });
 
+// Finaliza criação ao clicar duas vezes no mapa
 map.on('dblclick', () => {
-    if (appState === 'CREATING' && activeLinePoints.length > 1) openModal();
+    if (appState === 'CREATING' && activeLinePoints.length > 1) {
+        document.getElementById('modal-form').style.display = 'flex';
+        document.getElementById('input-name').focus();
+    }
 });
 
+// Desenha a linha amarela tracejada durante a criação
+function drawActivePolyline() {
+    if (activePolyline) map.removeLayer(activePolyline);
+    activePolyline = L.polyline(activeLinePoints, { 
+        color: '#facc15', 
+        dashArray: '10, 10', 
+        weight: 4 
+    }).addTo(map);
+}
+
 // ==========================================
-// 4. LÓGICA DE VAZAMENTO (RAPIDEZ E ÍCONE)
+// 5. LÓGICA DE VAZAMENTO (BURST)
 // ==========================================
 
 function handleBurstClick(clickLatLng) {
-    // Procura a linha mais próxima matematicamente
+    // Encontrar linha mais próxima
     let closestLine = null;
     let minDistance = Infinity;
     let closestIndex = -1;
 
     dbLines.forEach(line => {
+        if(line.burst) return; // Se já tem vazamento, ignora
         line.points.forEach((pt, idx) => {
             const dist = map.distance(clickLatLng, pt);
             if (dist < minDistance) {
@@ -116,13 +249,11 @@ function handleBurstClick(clickLatLng) {
         });
     });
 
-    // Se clicou muito longe (mais de 40 metros)
-    if (minDistance > 40 || !closestLine) {
-        alert("Nenhuma tubulação detectada perto do clique.");
+    if (minDistance > 50 || !closestLine) {
+        showToast("Nenhuma tubulação detectada neste ponto.");
         return;
     }
 
-    // Ação direta (confirm simples)
     if (confirm(`REPORTAR VAZAMENTO NA LINHA: ${closestLine.name}?`)) {
         closestLine.burst = {
             latlng: closestLine.points[closestIndex],
@@ -131,234 +262,221 @@ function handleBurstClick(clickLatLng) {
         };
         saveToStorage();
         renderLineOnMap(closestLine);
-        updateListHTML();
-        setMode('IDLE');
         
-        // Atualiza simulação visualmente
-        if (isSimulating) {
-            toggleSimulation();
-            setTimeout(toggleSimulation, 50);
+        // Se sistema ligado, atualiza o visual
+        if(systemActive) {
+            // Pequeno delay para efeito visual
+            setTimeout(() => animateLineFlow(closestLine, true), 100);
         }
-    }
-}
-
-function repairLine(id) {
-    const line = dbLines.find(l => l.id === id);
-    if (line && confirm("O reparo foi concluído? O fluxo voltará ao normal.")) {
-        line.burst = null;
-        saveToStorage();
-        renderLineOnMap(line);
-        updateListHTML();
-        if (isSimulating) { toggleSimulation(); setTimeout(toggleSimulation, 50); }
+        
+        setMode('IDLE'); // Sai do modo vazamento
+        updateDashboard();
+        showToast("🚨 Vazamento registrado! Queda de pressão detectada.");
     }
 }
 
 // ==========================================
-// 5. RENDERIZAÇÃO (COM ÍCONE ANIMADO)
+// 6. RENDERIZAÇÃO NO MAPA
 // ==========================================
 
 function renderLineOnMap(lineData) {
+    // Remove camadas antigas desta linha
     if (lineData.layers) lineData.layers.forEach(l => map.removeLayer(l));
     lineData.layers = [];
 
+    // Cores base
     const baseColor = lineData.type === 'vinhaça' ? '#d946ef' : '#3b82f6';
     
     if (lineData.burst && lineData.burst.active) {
-        // --- MODO VAZAMENTO ATIVO ---
+        // --- COM VAZAMENTO ---
         
-        // 1. Parte Viva (até o vazamento)
+        // 1. Parte "Viva" (até o vazamento)
         const activePoints = lineData.points.slice(0, lineData.burst.index + 1);
         const poly1 = L.polyline(activePoints, {
-            color: '#64748b', weight: 5, className: `line-${lineData.id}-active`
+            color: '#64748b', weight: 5, opacity: 0.8
         }).addTo(map);
         
-        // 2. Parte Morta (pós vazamento)
+        // 2. Parte "Morta" (pós vazamento - sem fluxo)
         const deadPoints = lineData.points.slice(lineData.burst.index);
         const poly2 = L.polyline(deadPoints, {
-            color: '#333', weight: 4, dashArray: '5, 10', opacity: 0.5
+            color: '#333', weight: 4, dashArray: '5, 10', opacity: 0.4
         }).addTo(map);
 
-        // 3. ÍCONE ESPECIAL ANIMADO (CSS)
+        // 3. Ícone de Alerta Animado
         const burstIcon = L.divIcon({
-            className: 'leak-alert-wrapper', // Wrapper transparente
+            className: 'leak-alert-wrapper',
             html: '<div class="leak-alert-icon"><i class="fa-solid fa-triangle-exclamation"></i></div>',
             iconSize: [40, 40],
-            iconAnchor: [20, 20] // Centralizado
+            iconAnchor: [20, 20]
         });
-
         const burstMarker = L.marker(lineData.burst.latlng, { icon: burstIcon }).addTo(map);
-
-        burstMarker.bindPopup(`
-            <div style="text-align:center">
-                <strong style="color:#ef4444; font-size:1.1em">🚨 VAZAMENTO CRÍTICO</strong><br>
-                <span style="color:#ccc">${lineData.name}</span><br>
-                <hr style="border-color:#444; margin:5px 0">
-                <button onclick="repairLine(${lineData.id})" class="action-btn" style="width:100%; font-size:0.8rem">
-                    <i class="fa-solid fa-wrench"></i> Concluir Reparo
-                </button>
-            </div>
-        `);
 
         lineData.layers.push(poly1, poly2, burstMarker);
 
     } else {
         // --- LINHA NORMAL ---
         const poly = L.polyline(lineData.points, {
-            color: '#64748b', weight: 5
+            color: '#64748b', // Cinza por padrão (Off)
+            weight: 5,
+            opacity: 0.7
         }).addTo(map);
 
-        poly.bindPopup(`
-            <div style="text-align:center;">
-                <strong>${lineData.name}</strong><br>
-                <small>${lineData.type.toUpperCase()}</small><br>
-                <button onclick="startEditing(${lineData.id})" style="margin-top:5px; background:#f59e0b; border:none; padding:4px 8px; border-radius:4px; cursor:pointer;">Editar Rota</button>
-            </div>
-        `);
+        // Popup simples ao clicar na linha
+        poly.bindPopup(`<b>${lineData.name}</b><br>Pressão Nominal: ${lineData.nominalPressure || 4} kgf`);
+        
         lineData.layers.push(poly);
     }
 }
 
-// ==========================================
-// 6. EDIÇÃO, SALVAMENTO E AUXILIARES
-// ==========================================
-
-function startEditing(id) {
-    if(appState !== 'IDLE') cancelAction();
-    const lineData = dbLines.find(l => l.id === id);
-    if(lineData.burst) { alert("Não é possível editar rota com vazamento ativo."); return; }
-
-    appState = 'EDITING';
-    editingId = id;
-    activeLinePoints = [...lineData.points];
+// Animação de Fluxo (chamada pelo botão Master)
+function animateLineFlow(line, active) {
+    // A camada principal é sempre a primeira (layers[0])
+    // Se tiver vazamento, layers[0] é o segmento até o vazamento
+    const poly = line.layers[0]; 
+    if(!poly || !(poly instanceof L.Polyline)) return;
     
-    if (lineData.layers) lineData.layers.forEach(l => map.removeLayer(l));
-    drawActivePolyline();
-    renderEditMarkers();
-    updateUI('Arraste pontos para ajustar. Clique no mapa para estender.', 'save-edit');
+    const color = line.type === 'vinhaça' ? '#d946ef' : '#3b82f6'; // Roxo ou Azul
+
+    if (active) {
+        // Ativa cor e animação CSS
+        poly.setStyle({ color: color, weight: 6, opacity: 1 });
+        if(poly._path) poly._path.classList.add('vinasse-flow');
+    } else {
+        // Volta para cinza
+        poly.setStyle({ color: '#64748b', weight: 5, opacity: 0.7 });
+        if(poly._path) poly._path.classList.remove('vinasse-flow');
+    }
 }
 
-function drawActivePolyline() {
-    if (activePolyline) map.removeLayer(activePolyline);
-    activePolyline = L.polyline(activeLinePoints, { color: '#facc15', dashArray: '10, 10', weight: 4 }).addTo(map);
-}
-
-function renderEditMarkers() {
-    editMarkers.forEach(m => map.removeLayer(m));
-    editMarkers = [];
-    activeLinePoints.forEach((point, index) => {
-        const marker = L.marker(point, {
-            draggable: true,
-            icon: L.divIcon({ className: 'edit-marker', iconSize: [12, 12], iconAnchor: [6, 6] })
-        }).addTo(map);
-        marker.on('drag', function(e) { activeLinePoints[index] = e.latlng; drawActivePolyline(); });
-        marker.on('contextmenu', function() {
-            if(activeLinePoints.length > 2) { activeLinePoints.splice(index, 1); drawActivePolyline(); renderEditMarkers(); }
-        });
-        editMarkers.push(marker);
-    });
-}
-
-function openModal() { document.getElementById('modal-form').style.display = 'flex'; setTimeout(() => document.getElementById('input-name').focus(), 100); }
-function closeModal() { document.getElementById('modal-form').style.display = 'none'; document.getElementById('input-name').value = ''; }
+// ==========================================
+// 7. FUNÇÕES AUXILIARES (Salvar, Deletar, Zoom)
+// ==========================================
 
 function saveNewData() {
     const name = document.getElementById('input-name').value;
     const type = document.getElementById('input-type').value;
+    const press = parseFloat(document.getElementById('input-pressure').value) || 4.0;
+    
     if(!name) { alert('Digite um nome!'); return; }
     
-    const newLine = { id: Date.now(), name: name, type: type, points: activeLinePoints, layers: [], burst: null };
+    const newLine = { 
+        id: Date.now(), 
+        name: name, 
+        type: type, 
+        nominalPressure: press,
+        points: activeLinePoints, 
+        layers: [], 
+        burst: null 
+    };
+    
     dbLines.push(newLine);
     saveToStorage();
+    
     if (activePolyline) map.removeLayer(activePolyline);
     renderLineOnMap(newLine);
-    closeModal(); resetState(); updateListHTML();
-}
+    
+    // Se sistema estiver ligado, já anima a nova linha
+    if(systemActive) animateLineFlow(newLine, true);
 
-function saveEditedLine() {
-    const idx = dbLines.findIndex(l => l.id === editingId);
-    if (idx > -1) {
-        dbLines[idx].points = activeLinePoints;
-        saveToStorage();
-        if (activePolyline) map.removeLayer(activePolyline);
-        editMarkers.forEach(m => map.removeLayer(m)); editMarkers = [];
-        renderLineOnMap(dbLines[idx]);
-        resetState();
-    }
+    cancelAction(); // Fecha modal e limpa
+    updateDashboard();
+    showToast("Nova linha cadastrada com sucesso.");
 }
 
 function cancelAction() {
+    document.getElementById('modal-form').style.display = 'none';
+    document.getElementById('input-name').value = '';
+    
     if (activePolyline) map.removeLayer(activePolyline);
-    editMarkers.forEach(m => map.removeLayer(m)); editMarkers = [];
-    if (appState === 'EDITING' && editingId) { const original = dbLines.find(l => l.id === editingId); if(original) renderLineOnMap(original); }
-    closeModal(); resetState();
+    activeLinePoints = [];
+    activePolyline = null;
+    
+    setMode('IDLE');
 }
 
-function resetState() {
-    appState = 'IDLE'; activeLinePoints = []; activePolyline = null; editingId = null;
-    map.getContainer().style.cursor = ''; updateUI('Painel de Controle', 'new');
+function deleteLine(id, e) {
+    if(e) e.stopPropagation();
+    if(confirm('Tem certeza que deseja remover esta linha?')) {
+        const idx = dbLines.findIndex(x => x.id === id);
+        if(idx > -1) {
+            // Remove do mapa
+            dbLines[idx].layers.forEach(l => map.removeLayer(l));
+            // Remove do array
+            dbLines.splice(idx, 1);
+            saveToStorage();
+            updateDashboard();
+            showToast("Linha removida.");
+        }
+    }
 }
 
-function updateUI(text, type) {
-    document.getElementById('status-msg').innerText = text;
-    const btn = document.getElementById('btn-main');
-    btn.classList.remove('active', 'btn-save-edit');
-    if(type === 'new') btn.innerHTML = '<i class="fa-solid fa-plus"></i> Nova Linha';
-    if(type === 'finish') { btn.innerHTML = '<i class="fa-solid fa-check"></i> Concluir'; btn.classList.add('active'); }
-    if(type === 'save-edit') { btn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Salvar'; btn.classList.add('btn-save-edit'); }
+function repairLine(id, e) {
+    if(e) e.stopPropagation(); // Evita zoom ao clicar no botão
+    const line = dbLines.find(l => l.id === id);
+    
+    if (line && confirm("Confirmar equipe de manutenção e reparo?")) {
+        line.burst = null; // Remove vazamento
+        saveToStorage();
+        renderLineOnMap(line);
+        
+        if(systemActive) {
+            // Restaura fluxo visual
+            animateLineFlow(line, true);
+        }
+        
+        updateDashboard();
+        showToast("Reparo concluído. Pressão normalizada.");
+    }
 }
 
-function updateListHTML() {
-    const container = document.getElementById('saved-list');
-    container.innerHTML = '';
-    if(dbLines.length === 0) { container.innerHTML = '<p style="text-align:center;color:#666">Vazio</p>'; return; }
-    dbLines.forEach(line => {
-        const hasBurst = line.burst && line.burst.active;
-        const item = document.createElement('div');
-        item.className = `saved-item ${hasBurst ? 'has-burst' : ''}`;
-        item.innerHTML = `
-            <div class="item-info" onclick="zoomToLine(${line.id})">
-                <strong>${line.name}</strong><br>
-                <small style="color:${line.type==='vinhaça'?'#d946ef':'#3b82f6'}">${line.type.toUpperCase()}</small>
-                ${hasBurst ? '<br><small style="color:#ef4444; font-weight:bold"><i class="fa-solid fa-triangle-exclamation"></i> VAZAMENTO</small>' : ''}
-            </div>
-            <div class="item-actions">
-                ${hasBurst ? 
-                  `<button class="btn-icon btn-repair" onclick="repairLine(${line.id})" title="Reparar"><i class="fa-solid fa-wrench"></i></button>` : 
-                  `<button class="btn-icon btn-edit" onclick="startEditing(${line.id})" title="Editar"><i class="fa-solid fa-pen"></i></button>`
-                }
-                <button class="btn-icon btn-del" onclick="deleteLine(${line.id})"><i class="fa-solid fa-times"></i></button>
-            </div>`;
-        container.appendChild(item);
-    });
+// Funções de UI
+function showToast(msg) {
+    const t = document.getElementById('toast-status');
+    t.innerText = msg;
+    t.classList.remove('hidden');
+    setTimeout(() => t.classList.add('hidden'), 3000);
 }
 
-function saveToStorage() { localStorage.setItem('usina_sys_v5', JSON.stringify(dbLines.map(l => ({ id: l.id, name: l.name, type: l.type, points: l.points, burst: l.burst })))); }
-function loadFromStorage() { const d = localStorage.getItem('usina_sys_v5'); if(d) { JSON.parse(d).forEach(l => { l.layers = []; dbLines.push(l); renderLineOnMap(l); }); updateListHTML(); } }
-window.zoomToLine = function(id) { const l = dbLines.find(x => x.id === id); if(l && l.layers[0]) map.fitBounds(l.layers[0].getBounds()); }
-window.deleteLine = function(id) { if(confirm('Excluir?')) { const i = dbLines.findIndex(x => x.id === id); if(i>-1) { dbLines[i].layers.forEach(x => map.removeLayer(x)); dbLines.splice(i,1); saveToStorage(); updateListHTML(); } } }
-window.clearAllData = function() { if(confirm('Resetar tudo?')) { localStorage.removeItem('usina_sys_v5'); location.reload(); } }
+window.zoomToLine = function(id) {
+    const l = dbLines.find(x => x.id === id);
+    if(l && l.layers[0]) {
+        map.fitBounds(l.layers[0].getBounds(), { padding: [50, 50] });
+    }
+}
 
-window.toggleSimulation = function() {
-    isSimulating = !isSimulating;
-    const btn = document.getElementById('btn-simulate');
-    if(isSimulating) {
-        btn.innerHTML = '<i class="fa-solid fa-stop"></i> Parar'; btn.style.background = '#eab308';
-        dbLines.forEach(line => {
-            const activePoly = line.layers[0];
-            const color = line.type === 'vinhaça' ? '#d946ef' : '#3b82f6';
-            if(activePoly && activePoly instanceof L.Polyline) {
-                activePoly.setStyle({ color: color, weight: 6, opacity: 1 });
-                if(activePoly._path) activePoly._path.classList.add('vinasse-flow');
-            }
+window.clearAllData = function() {
+    if(confirm('ATENÇÃO: Isso apagará TODOS os dados e reiniciará o sistema. Continuar?')) {
+        localStorage.removeItem('usina_sys_v2');
+        location.reload();
+    }
+}
+
+// ==========================================
+// 8. STORAGE (PERSISTÊNCIA)
+// ==========================================
+
+function saveToStorage() {
+    // Salvamos apenas os dados puros (sem camadas Leaflet)
+    const dataToSave = dbLines.map(l => ({
+        id: l.id,
+        name: l.name,
+        type: l.type,
+        nominalPressure: l.nominalPressure,
+        points: l.points,
+        burst: l.burst
+    }));
+    localStorage.setItem('usina_sys_v2', JSON.stringify(dataToSave));
+}
+
+function loadFromStorage() {
+    const d = localStorage.getItem('usina_sys_v2');
+    if(d) {
+        const parsed = JSON.parse(d);
+        parsed.forEach(l => {
+            l.layers = []; // Reinicializa array de camadas
+            dbLines.push(l);
+            renderLineOnMap(l);
         });
-    } else {
-        btn.innerHTML = '<i class="fa-solid fa-play"></i> Simular Fluxo'; btn.style.background = '';
-        dbLines.forEach(line => {
-            const activePoly = line.layers[0];
-            if(activePoly && activePoly instanceof L.Polyline) {
-                activePoly.setStyle({ color: '#64748b', weight: 5 });
-                if(activePoly._path) activePoly._path.classList.remove('vinasse-flow');
-            }
-        });
+        updateDashboard();
     }
 }
